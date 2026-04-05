@@ -52,27 +52,32 @@ export default function Hero() {
 
       {/* Left Column: Name & Roles */}
       <div className="hero-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: '50%' }}>
-        <motion.h1
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.8 }}
-          onMouseMove={handleNameMouseMove}
-          onMouseLeave={handleNameMouseLeave}
-          style={{
-            rotateY,
-            perspective: 1000,
-            transformStyle: "preserve-3d",
-            transition: "transform 0.1s ease-out",
-            fontSize: 'clamp(3rem, 8vw, 5rem)',
-            fontWeight: 700,
-            marginBottom: '1.5rem',
-            letterSpacing: '-0.05em',
-            cursor: 'pointer',
-            pointerEvents: 'auto'
-          }}
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
         >
-          Yug Srivastav
-        </motion.h1>
+          <motion.h1
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.8 }}
+            onMouseMove={handleNameMouseMove}
+            onMouseLeave={handleNameMouseLeave}
+            style={{
+              rotateY,
+              perspective: 1000,
+              transformStyle: "preserve-3d",
+              transition: "transform 0.1s ease-out",
+              fontSize: 'clamp(3rem, 8vw, 5rem)',
+              fontWeight: 700,
+              marginBottom: '1.5rem',
+              letterSpacing: '-0.05em',
+              cursor: 'pointer',
+              pointerEvents: 'auto'
+            }}
+          >
+            Yug Srivastav
+          </motion.h1>
+        </motion.div>
 
         {/* Interactive Floating Role Badges */}
         <motion.div

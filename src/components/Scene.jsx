@@ -35,8 +35,8 @@ function createPointTexture() {
   const context = canvas.getContext('2d');
   const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
   gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-  gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
-  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)'); // Sharper falloff
+  gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.4)');
   gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
   context.fillStyle = gradient;
   context.fillRect(0, 0, 64, 64);
@@ -58,77 +58,104 @@ function createSunGlowTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
-function Nebula({ scrollRef, isHome }) {
+function DotGrid({ scrollRef, isHome }) {
   const ref = useRef();
-  const count = 15000;
-  const texture = useMemo(() => createPointTexture(), []);
+  const count = 120 * 120;
+  const dotTexture = useMemo(() => createPointTexture(), []);
   const mouse = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMove = (e) => {
       mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMove);
+    return () => window.removeEventListener('mousemove', handleMove);
   }, []);
 
-  const { positions, colors } = useMemo(() => {
+  const { positions, colors, originalPositions } = useMemo(() => {
     const p = new Float32Array(count * 3);
+    const op = new Float32Array(count * 3);
     const c = new Float32Array(count * 3);
-    const color1 = new THREE.Color('#ff0066');
-    const color2 = new THREE.Color('#00ffff');
-    const color3 = new THREE.Color('#9900ff');
-    const color4 = new THREE.Color('#ff5500');
+    const colorGrey = new THREE.Color('#444444');
+    const side = 120;
+    const spacing = 1.0;
 
-    for (let i = 0; i < count; i++) {
-      const radius = Math.random() * 6 + 1.0;
-      const spinAngle = radius * 0.4;
-      const branchAngle = ((i % 4) / 4) * Math.PI * 2;
-      const spreadX = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 2;
-      const spreadY = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 1.5;
-      const spreadZ = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 2;
-      const x = Math.cos(branchAngle + spinAngle) * radius + spreadX;
-      const y = spreadY + (Math.sin(radius) * 0.5);
-      const z = Math.sin(branchAngle + spinAngle) * radius + spreadZ;
-      p[i * 3] = x;
-      p[i * 3 + 1] = y;
-      p[i * 3 + 2] = z;
-      const baseColor = color3.clone();
-      if (radius > 4.5) { baseColor.lerp(color2, Math.random()); }
-      else if (radius > 2.5) { baseColor.lerp(color1, Math.random()); }
-      else { baseColor.lerp(color4, Math.random()); }
-      c[i * 3] = baseColor.r;
-      c[i * 3 + 1] = baseColor.g;
-      c[i * 3 + 2] = baseColor.b;
+    for (let i = 0; i < side; i++) {
+        for (let j = 0; j < side; j++) {
+            const index = i * side + j;
+            const x = (i - side / 2) * spacing;
+            const z = (j - side / 2) * spacing;
+            const y = -2.5; // Flat floor baseline
+
+            p[index * 3] = x;
+            p[index * 3 + 1] = y;
+            p[index * 3 + 2] = z;
+
+            op[index * 3] = x;
+            op[index * 3 + 1] = y; // Original baseline
+            op[index * 3 + 2] = z;
+
+            c[index * 3] = 0.6; // Brighter default grey
+            c[index * 3 + 1] = 0.6;
+            c[index * 3 + 2] = 0.6;
+        }
     }
-    return { positions: p, colors: c };
+    return { positions: p, colors: c, originalPositions: op };
   }, [count]);
 
-  useFrame((state, delta) => {
-    if (!ref.current) return;
-    const scrollY = scrollRef.current;
+  useFrame((state) => {
+      if (!ref.current) return;
+      const posAttr = ref.current.geometry.attributes.position;
+      const colAttr = ref.current.geometry.attributes.color;
+      const time = state.clock.elapsedTime;
+      const scrollY = scrollRef.current;
+      const colorPurple = new THREE.Color('#a855f7');
+      const colorWhite = new THREE.Color('#ffffff');
 
-    // Global Nebula physics: respond to scroll везде
-    const isActive = isHome;
-    const heroFactor = Math.max(0, 1 - scrollY / 700);
-    const scrollFactor = Math.min(scrollY / 350, 1);
+      for (let i = 0; i < count; i++) {
+          const ix = originalPositions[i * 3];
+          const iz = originalPositions[i * 3 + 2];
+          const iy = originalPositions[i * 3 + 1];
 
-    ref.current.rotation.y -= (delta / 5) + (scrollY * 0.00034);
-    ref.current.rotation.x -= (delta / 10) + (scrollY * 0.00016);
-    // Nebula points now remain stationary in space to act as a fixed reference for the camera's dive
-    ref.current.position.z = Math.sin(state.clock.elapsedTime * 0.15) * (5.0 * heroFactor);
-    ref.current.position.y = Math.cos(state.clock.elapsedTime * 0.3) * 0.08;
-    ref.current.position.x = 0;
-    ref.current.rotation.z = 0;
+          // WAVE MATH: Circular ripple from center (Higher Amplitude)
+          const dist = Math.sqrt(ix * ix + iz * iz);
+          const wave = Math.sin(dist * 0.2 - time * 2.0) * 0.65;
+          const secondaryWave = Math.sin(dist * 0.5 + time * 3.0) * 0.15; // Faster, subtle interference
+          const slowWave = Math.sin(ix * 0.1 + iz * 0.1 + time * 1.5) * 0.35;
+          
+          // ADDITIVE JITTER: Small random movement for "data noise" feel
+          const jitter = (Math.sin(time * 10 + i) * 0.05);
 
-    const scalePulse = 1 + scrollFactor * 0.35 + Math.sin(state.clock.elapsedTime * 0.15) * (0.25 * heroFactor);
-    ref.current.scale.set(scalePulse, scalePulse, scalePulse);
+          // MOUSE DISPLACEMENT logic
+          const mx = (mouse.current.x * 25); 
+          const mz = -(mouse.current.y * 25); 
+          const dx = ix - mx;
+          const dz = iz - (mz + 10); 
+          const mouseDist = Math.sqrt(dx * dx + dz * dz);
+          const mouseDisplacement = mouseDist < 8 ? Math.exp(-mouseDist * 0.4) * 2.5 : 0;
 
-    const targetX = (mouse.current.x * 0.4);
-    const targetY = (mouse.current.y * 0.4);
-    ref.current.rotation.x += (targetY - ref.current.rotation.x) * 0.02;
-    ref.current.rotation.y += (targetX - ref.current.rotation.y) * 0.02;
+          // Apply displacement to Y (flat floor)
+          const finalY = iy + wave + secondaryWave + slowWave + mouseDisplacement + jitter;
+          posAttr.array[i * 3 + 1] = finalY;
+
+          // COLOR SHIFT: Blend to Purple based on wave height + Breathing pulse
+          const pulse = Math.sin(time * 1.5 + dist * 0.1) * 0.1;
+          const colorIntensity = Math.max(0, Math.min(1, (wave + 0.65) / 1.3 + pulse)); 
+          const mixColor = colorWhite.clone().lerp(colorPurple, colorIntensity * 0.9);
+          
+          colAttr.array[i * 3] = mixColor.r;
+          colAttr.array[i * 3 + 1] = mixColor.g;
+          colAttr.array[i * 3 + 2] = mixColor.b;
+      }
+
+      posAttr.needsUpdate = true;
+      colAttr.needsUpdate = true;
+
+      // Parallax move relative to scroll + Slow Lateral Sway
+      ref.current.position.x = Math.sin(time * 0.3) * 0.5;
+      ref.current.position.y = -scrollY * 0.001 + Math.cos(time * 0.5) * 0.2; 
+      ref.current.position.z = -15 + (scrollY * 0.0005);
   });
 
   return (
@@ -137,7 +164,7 @@ function Nebula({ scrollRef, isHome }) {
         <bufferAttribute attach="attributes-position" count={positions.length / 3} array={positions} itemSize={3} />
         <bufferAttribute attach="attributes-color" count={colors.length / 3} array={colors} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial size={0.11} sizeAttenuation={true} depthWrite={false} blending={THREE.AdditiveBlending} vertexColors={true} transparent={true} map={texture} opacity={0.65} />
+      <pointsMaterial size={0.14} sizeAttenuation={true} depthWrite={false} blending={THREE.AdditiveBlending} vertexColors={true} transparent={true} map={dotTexture} opacity={1.0} />
     </points>
   );
 }
@@ -382,7 +409,7 @@ export default function Scene() {
       <Meteors />
       <MyLifeSun scrollRef={scrollRef} isActive={isMyLife} />
 
-      <Nebula scrollRef={scrollRef} isHome={isHome} />
+      <DotGrid scrollRef={scrollRef} isHome={isHome} />
       <Preload all />
     </Canvas>
   );
